@@ -21,6 +21,10 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $errors[] = "Email wajib diisi dengan format yang benar.";
 }
 
+if ($no_hp !== '' && !preg_match('/^[0-9+\- ]+$/', $no_hp)) {
+    $errors[] = "No. HP hanya boleh berisi angka, spasi, tanda plus (+), dan tanda hubung (-).";
+}
+
 if (!empty($errors)) {
     $_SESSION['flash'] = ['type' => 'error', 'pesan' => implode(' ', $errors)];
     header('Location: tambah.php');
