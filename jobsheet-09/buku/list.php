@@ -5,31 +5,59 @@ include __DIR__ . '/../includes/header.php';
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
-// 5. Membaca Data: list.php & index.php
 require __DIR__ . '/../includes/koneksi.php';
 
-$keyword = trim($_GET['cari'] ?? '');
+// 5.1 Query dengan LIMIT/OFFSET + pencarian
+$perPage = 10;
+$page    = max(1, (int) ($_GET['page'] ?? 1));
+$offset  = ($page - 1) * $perPage;
+$keyword = trim($_GET['q'] ?? '');
+// Latihan 3: cari di judul ATAU pengarang
+$like = '%' . $keyword . '%';
 
 if ($keyword !== '') {
-    $stmt = $pdo->prepare("SELECT * FROM buku WHERE judul ILIKE :keyword ORDER BY id DESC");
-    $stmt->execute(['keyword' => '%' . $keyword . '%']);
-    $daftarBuku = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $hitung = $pdo->prepare(
+        "SELECT COUNT(*) FROM buku WHERE judul ILIKE :kw OR pengarang ILIKE :kw2"
+    );
+    $hitung->execute(['kw' => $like, 'kw2' => $like]);
+    $totalRows = $hitung->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        "SELECT * FROM buku WHERE judul ILIKE :kw OR pengarang ILIKE :kw2
+         ORDER BY id DESC LIMIT :limit OFFSET :offset"
+    );
+    $stmt->bindValue('kw', $like);
+    $stmt->bindValue('kw2', $like);
 } else {
-    $daftarBuku = $pdo->query("SELECT * FROM buku ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    $totalRows = $pdo->query("SELECT COUNT(*) FROM buku")->fetchColumn();
+    $stmt = $pdo->prepare(
+        "SELECT * FROM buku ORDER BY id DESC LIMIT :limit OFFSET :offset"
+    );
 }
+$stmt->bindValue('limit', $perPage, PDO::PARAM_INT);
+$stmt->bindValue('offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+
+$daftarBuku = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$totalPages = max(1, (int) ceil($totalRows / $perPage));
 ?>
 <section>
   <h2>Daftar Buku</h2>
 
   <?php if ($flash): ?>
-    <p class="flash flash-<?php echo $flash['type']; ?>"><?php echo $flash['pesan']; ?></p>
+  <p class="flash flash-<?php echo $flash['type']; ?>"><?php echo $flash['pesan']; ?></p>
   <?php endif; ?>
 
-  <form method="GET" class="search-box">
-    <label for="search-input">Cari Judul Buku</label>
-    <input type="text" id="search-input" name="cari" placeholder="Ketik judul buku..." value="<?php echo htmlspecialchars($keyword); ?>">
-    <button type="submit">Cari</button>
-  </form>
+  <!-- 5.8 Form Pencarian: method="get" -->
+  <div class="search-box">
+    <form method="get" action="list.php">
+      <span>
+        <label for="search-input">Cari Judul / Pengarang</label>
+        <input type="text" id="search-input" name="q" value="<?php echo $keyword; ?>" placeholder="Ketik judul buku...">
+      </span>
+      <button type="submit">Cari</button>
+    </form>
+  </div>
 
   <div class="table-responsive">
     <table>
@@ -57,9 +85,13 @@ if ($keyword !== '') {
               <td><?php echo $buku['stok']; ?></td>
               <td><?php echo date('d-m-Y H:i', strtotime($buku['tanggal_ditambahkan'])); ?></td>
               <td>
-                <button type="button" class="btn-edit">Edit</button>
+                <a href="edit.php?id=<?php echo $buku['id']; ?>" class="btn-edit">Edit</a>
                 <button type="button" class="btn-detail">Detail</button>
-                <button type="button" class="btn-hapus">Hapus</button>
+                <!-- 3.5 Form hapus: method POST ke hapus.php -->
+                <form class="form-hapus" method="post" action="hapus.php">
+                  <input type="hidden" name="id" value="<?php echo $buku['id']; ?>">
+                  <button type="submit" class="btn-hapus">Hapus</button>
+                </form>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -67,5 +99,13 @@ if ($keyword !== '') {
       </tbody>
     </table>
   </div>
+
+  <!-- 5.9 Menampilkan Navigasi Halaman -->
+  <nav class="pagination">
+    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+      <a href="list.php?page=<?php echo $i; ?><?php echo $keyword !== '' ? '&q=' . urlencode($keyword) : ''; ?>"
+         class="<?php echo $i === $page ? 'active' : ''; ?>"><?php echo $i; ?></a>
+    <?php endfor; ?>
+  </nav>
 </section>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

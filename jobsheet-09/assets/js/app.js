@@ -9,7 +9,6 @@ async function muatDaftar(url, kolomKunci) {
   tbody.innerHTML = "";
 
   try {
-    
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const res = await fetch(url);
@@ -21,20 +20,26 @@ async function muatDaftar(url, kolomKunci) {
     daftar.forEach(function (item) {
       const tr = document.createElement("tr");
       const selKolom = kolomKunci
-        .map(function (kunci) { return "<td>" + item[kunci] + "</td>"; })
+        .map(function (kunci) {
+          return "<td>" + item[kunci] + "</td>";
+        })
         .join("");
       tr.innerHTML =
         selKolom +
         "<td>" +
-        "<button type=\"button\" class=\"btn-edit\">Edit</button> " +
-        "<button type=\"button\" class=\"btn-detail\">Detail</button> " +
-        "<button type=\"button\" class=\"btn-hapus\">Hapus</button>" +
+        '<button type="button" class="btn-edit">Edit</button> ' +
+        '<button type="button" class="btn-detail">Detail</button> ' +
+        '<button type="button" class="btn-hapus">Hapus</button>' +
         "</td>";
       tbody.appendChild(tr);
     });
   } catch (err) {
     tbody.innerHTML =
-      "<tr><td colspan=\"" + (kolomKunci.length + 1) + "\">Gagal memuat data: " + err.message + "</td></tr>";
+      '<tr><td colspan="' +
+      (kolomKunci.length + 1) +
+      '">Gagal memuat data: ' +
+      err.message +
+      "</td></tr>";
   } finally {
     loading.style.display = "none";
   }
@@ -60,18 +65,22 @@ document.addEventListener("DOMContentLoaded", function () {
   initValidasiForm();
 });
 
-// Memakai event delegation di document karena baris tabel sekarang
-// dirender dinamis via fetch (lihat buku.js/anggota.js) sehingga
-// tombol .btn-hapus belum tentu ada saat DOMContentLoaded.
+// Tombol Hapus kini berada di dalam <form class="form-hapus" method="post">
+// yang benar-benar mengirim request DELETE ke server (buku/hapus.php,
+// anggota/hapus.php). Konfirmasi dilakukan pada event "submit" agar bisa
+// dibatalkan (preventDefault) sebelum request terkirim.
 function initHapusConfirm() {
-  document.addEventListener("click", function (e) {
-    const btn = e.target.closest(".btn-hapus");
-    if (!btn) return;
-    const row = btn.closest("tr");
+  // 4.3 Solusi: Dengarkan Event submit, Bukan click
+  document.addEventListener("submit", function (e) {
+    const form = e.target;
+    if (!form.classList.contains("form-hapus")) return;
+    // 4.5 Mencari Baris: form.closest("tr"
+    const row = form.closest("tr");
     const nama = row ? row.querySelector("td")?.textContent : "data ini";
+    // 4.4 Membatalkan Submit dengan preventDefault()
     const yakin = confirm('Yakin ingin menghapus "' + nama + '"?');
-    if (yakin && row) {
-      row.remove();
+    if (!yakin) {
+      e.preventDefault();
     }
   });
 }
